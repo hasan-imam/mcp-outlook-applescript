@@ -830,27 +830,37 @@ function buildRecurrenceScript(params: RecurrenceScriptParams): string {
  * Responds to an event invitation (RSVP).
  */
 export function respondToEvent(params: RespondToEventParams): string {
-    const { eventId, response, comment } = params;
-    // Map response to AppleScript status value
+    const { eventId, response, sendResponse, comment } = params;
+    const commandMap: Record<string, string> = {
+        accept: 'accept meeting',
+        decline: 'decline meeting',
+        tentative: 'accept tentatively meeting',
+    };
+    const responseCommand = commandMap[response];
+    const responseOptions = comment != null
+        ? ` comment "${escapeForAppleScript(comment)}" sending response ${sendResponse}`
+        : ` sending response ${sendResponse}`;
+
+    // Use Outlook's meeting-response commands so the organizer can be notified.
+    // Setting the event response status alone does not reliably send an RSVP.
+    const responseLine = `${responseCommand} myEvent${responseOptions}`;
+
     const statusMap: Record<string, string> = {
-        accept: 'accept',
-        decline: 'decline',
-        tentative: 'tentative accept',
+        accept: 'accepted',
+        decline: 'declined',
+        tentative: 'tentatively accepted',
     };
     const status = statusMap[response];
-    // Escape comment if provided
-    const commentLine = comment != null
-        ? `set comment of myEvent to "${escapeForAppleScript(comment)}"`
-        : '';
+    const notified = sendResponse ? 'true' : 'false';
+    const commentIncluded = comment != null ? 'true' : 'false';
     return `
 tell application "Microsoft Outlook"
   try
     set myEvent to calendar event id ${eventId}
-    set response status of myEvent to ${status}
-    ${commentLine}
+    ${responseLine}
 
     -- Return success
-    set output to "{{RECORD}}success{{=}}true{{FIELD}}eventId{{=}}" & ${eventId}
+    set output to "{{RECORD}}success{{=}}true{{FIELD}}eventId{{=}}" & ${eventId} & "{{FIELD}}status{{=}}${status}{{FIELD}}sentResponse{{=}}${notified}{{FIELD}}commentIncluded{{=}}${commentIncluded}"
     return output
   on error errMsg
     -- Return failure
