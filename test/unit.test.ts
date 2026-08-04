@@ -883,14 +883,19 @@ describe('sendEmail template escaping', () => {
     expect(script).toContain('reply@example.com');
   });
 
-  it('uses html content property for html bodyType', () => {
+  it('uses content property for html bodyType', () => {
+    // Outlook's AppleScript dictionary names the HTML body property "content"
+    // (see `message` class: `content` -- "The HTML content of a message").
+    // "html content" is not a valid property and causes a -2741 syntax error
+    // ("Expected ':' but found property") when compiled by osascript.
     const script = sendEmail({
       to: ['test@example.com'],
       subject: 'test',
       body: '<h1>Hello</h1>',
       bodyType: 'html',
     });
-    expect(script).toContain('html content:');
+    expect(script).toContain('content:');
+    expect(script).not.toContain('html content:');
   });
 
   it('uses plain text content property for plain bodyType', () => {
