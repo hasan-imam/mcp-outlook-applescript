@@ -1652,8 +1652,12 @@ export function sendEmail(params: SendEmailParams): string {
     const bccRecipients = bcc != null && bcc.length > 0
         ? bcc.map(email => `    make new recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}, recipient type:recipient bcc}`).join('\n')
         : '';
+    // Outlook's AppleScript dictionary names the HTML body property "content"
+    // (see the `message` class: `content` -- "The HTML content of a message").
+    // "html content" is not a valid property and causes a -2741 syntax error
+    // ("Expected ':' but found property") when compiled by osascript.
     const contentProperty = bodyType === 'html'
-        ? `html content:"${escapedBody}"`
+        ? `content:"${escapedBody}"`
         : `plain text content:"${escapedBody}"`;
     const replyToStatement = replyTo != null
         ? `    set reply to of newMessage to "${escapeForAppleScript(replyTo)}"`
