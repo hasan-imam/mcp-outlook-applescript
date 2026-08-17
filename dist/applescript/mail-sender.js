@@ -60,6 +60,48 @@ export class AppleScriptMailSender {
             sentAt: result.sentAt ?? '',
         };
     }
+    /**
+     * Sends a reply to an existing email via AppleScript.
+     * @param params - Contains the source message ID and reply body/type.
+     * @returns The sent reply's message ID and timestamp.
+     * @throws MailSendError if Outlook reports a send failure.
+     */
+    replyEmail(params) {
+        const script = scripts.replyEmail(params);
+        const output = executeAppleScriptOrThrow(script);
+        const result = parseSendEmailResult(output);
+        if (result == null) {
+            throw new AppleScriptError('Failed to parse reply email response');
+        }
+        if (!result.success) {
+            throw new MailSendError(result.error ?? 'Unknown error');
+        }
+        return {
+            messageId: result.messageId ?? '',
+            sentAt: result.sentAt ?? '',
+        };
+    }
+    /**
+     * Creates a reply-all draft for an existing email via AppleScript.
+     * @param params - Contains the source message ID and reply body/type.
+     * @returns The saved draft message ID.
+     * @throws MailSendError if Outlook reports a failure or the draft cannot be saved.
+     */
+    replyAllEmail(params) {
+        const script = scripts.replyAllEmail(params);
+        const output = executeAppleScriptOrThrow(script);
+        const result = parseSendEmailResult(output);
+        if (result == null) {
+            throw new AppleScriptError('Failed to parse reply-all draft response');
+        }
+        if (!result.success) {
+            throw new MailSendError(result.error ?? 'Unknown error');
+        }
+        return {
+            messageId: result.messageId ?? '',
+            sentAt: result.sentAt ?? '',
+        };
+    }
 }
 /** Creates a new AppleScriptMailSender instance. */
 export function createMailSender() {

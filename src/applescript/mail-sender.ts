@@ -16,6 +16,11 @@ export interface InlineImage {
     readonly contentId: string;
 }
 
+/** Re-export reply parameters used by this sender. */
+export type ReplyEmailParams = scripts.ReplyEmailParams;
+/** Re-export reply-all parameters used by this sender. */
+export type ReplyAllEmailParams = scripts.ReplyAllEmailParams;
+
 /** Input parameters for composing and sending an email. */
 export interface MailSenderParams {
     readonly to: readonly string[];
@@ -40,6 +45,10 @@ export interface SentEmail {
 export interface IMailSender {
     /** Composes and sends an email with the given parameters. */
     sendEmail(params: MailSenderParams): SentEmail;
+    /** Composes and sends a reply to an existing email. */
+    replyEmail(params: scripts.ReplyEmailParams): SentEmail;
+    /** Creates a reply-all draft for an existing email. */
+    replyAllEmail(params: scripts.ReplyAllEmailParams): SentEmail;
 }
 
 /** Sends email through Outlook via AppleScript. */
@@ -90,6 +99,50 @@ export class AppleScriptMailSender implements IMailSender {
         const result = parseSendEmailResult(output);
         if (result == null) {
             throw new AppleScriptError('Failed to parse send email response');
+        }
+        if (!result.success) {
+            throw new MailSendError(result.error ?? 'Unknown error');
+        }
+        return {
+            messageId: result.messageId ?? '',
+            sentAt: result.sentAt ?? '',
+        };
+    }
+
+    /**
+     * Sends a reply to an existing email via AppleScript.
+     * @param params - Contains the source message ID and reply body/type.
+     * @returns The sent reply's message ID and timestamp.
+     * @throws MailSendError if Outlook reports a send failure.
+     */
+    replyEmail(params: scripts.ReplyEmailParams): SentEmail {
+        const script = scripts.replyEmail(params);
+        const output = executeAppleScriptOrThrow(script);
+        const result = parseSendEmailResult(output);
+        if (result == null) {
+            throw new AppleScriptError('Failed to parse reply email response');
+        }
+        if (!result.success) {
+            throw new MailSendError(result.error ?? 'Unknown error');
+        }
+        return {
+            messageId: result.messageId ?? '',
+            sentAt: result.sentAt ?? '',
+        };
+    }
+
+    /**
+     * Creates a reply-all draft for an existing email via AppleScript.
+     * @param params - Contains the source message ID and reply body/type.
+     * @returns The saved draft message ID.
+     * @throws MailSendError if Outlook reports a failure or the draft cannot be saved.
+     */
+    replyAllEmail(params: scripts.ReplyAllEmailParams): SentEmail {
+        const script = scripts.replyAllEmail(params);
+        const output = executeAppleScriptOrThrow(script);
+        const result = parseSendEmailResult(output);
+        if (result == null) {
+            throw new AppleScriptError('Failed to parse reply-all draft response');
         }
         if (!result.success) {
             throw new MailSendError(result.error ?? 'Unknown error');

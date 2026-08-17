@@ -1,5 +1,5 @@
 // Mail tools
-export { MailTools, createMailTools, ListAccountsInput, ListFoldersInput, ListFoldersWithAccountInput, ListEmailsInput, SearchEmailsInput, GetEmailInput, GetUnreadCountInput, ListAttachmentsInput, DownloadAttachmentInput, SendEmailInput, nullContentReader, } from './mail.js';
+export { MailTools, createMailTools, ListAccountsInput, ListFoldersInput, ListFoldersWithAccountInput, ListEmailsInput, SearchEmailsInput, GetEmailInput, GetUnreadCountInput, ListAttachmentsInput, DownloadAttachmentInput, SendEmailInput, ReplyEmailInput, ReplyAllEmailInput, nullContentReader, } from './mail.js';
 // Calendar tools
 export { CalendarTools, createCalendarTools, ListCalendarsInput, ListEventsInput, GetEventInput, SearchEventsInput, CreateEventInput, RespondToEventInput, DeleteEventInput, UpdateEventInput, nullEventContentReader, } from './calendar.js';
 // Contacts tools

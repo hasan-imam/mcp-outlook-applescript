@@ -1,6 +1,6 @@
 {
   "name": "mcp-outlook-applescript",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "MCP server for Microsoft Outlook on Mac. Access mail, calendar, contacts, tasks, and notes via AppleScript.",
   "type": "module",
   "bin": {

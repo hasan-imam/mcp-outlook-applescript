@@ -1,11 +1,11 @@
 # mcp-outlook-applescript
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server for Microsoft Outlook on Mac. Access your mail, calendar, contacts, tasks, and notes through 49 MCP tools powered by AppleScript.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server for Microsoft Outlook on Mac. Access your mail, calendar, contacts, tasks, and notes through 50 MCP tools powered by AppleScript.
 
 ## Features
 
 - **AppleScript backend** — works with classic Outlook for Mac, no network or authentication required
-- **49 tools** — full coverage of mail, calendar, contacts, tasks, and notes
+- **50 tools** — full coverage of mail, calendar, contacts, tasks, and notes
 - **Approval system** — destructive operations (delete, move, junk) require a two-step prepare/confirm flow
 - **Zero native dependencies** — pure TypeScript + AppleScript, no C++ compilation needed
 
@@ -13,7 +13,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server for Microsof
 
 | Category | Tools |
 |----------|-------|
-| **Mail** | `list_folders`, `list_emails`, `search_emails`, `get_email`, `get_unread_count`, `send_email`, `list_attachments`, `download_attachment` |
+| **Mail** | `list_folders`, `list_emails`, `search_emails`, `get_email`, `get_unread_count`, `send_email`, `reply_to_email`, `reply_all_email`, `list_attachments`, `download_attachment` |
 | **Mail Organization** | `mark_email_read`, `mark_email_unread`, `set_email_flag`, `clear_email_flag`, `set_email_categories`, `prepare/confirm_delete_email`, `prepare/confirm_move_email`, `prepare/confirm_archive_email`, `prepare/confirm_junk_email`, `prepare/confirm_batch_*` |
 | **Folders** | `create_folder`, `rename_folder`, `move_folder`, `prepare/confirm_delete_folder`, `prepare/confirm_empty_folder` |
 | **Calendar** | `list_calendars`, `list_events`, `get_event`, `search_events`, `create_event`, `update_event`, `delete_event`, `respond_to_event` |

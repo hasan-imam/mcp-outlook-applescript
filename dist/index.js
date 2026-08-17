@@ -7,9 +7,10 @@ import { createCalendarTools } from './tools/calendar.js';
 import { createContactsTools } from './tools/contacts.js';
 import { createTasksTools } from './tools/tasks.js';
 import { createNotesTools } from './tools/notes.js';
-import { createMailboxOrganizationTools, ListAccountsInput, ListEmailsInput, SearchEmailsInput, GetEmailInput, GetUnreadCountInput, ListAttachmentsInput, DownloadAttachmentInput, ListCalendarsInput, ListEventsInput, GetEventInput, SearchEventsInput, CreateEventInput, RespondToEventInput, DeleteEventInput, UpdateEventInput, ListContactsInput, SearchContactsInput, GetContactInput, ListTasksInput, SearchTasksInput, GetTaskInput, ListNotesInput, GetNoteInput, SearchNotesInput, ListFoldersWithAccountInput, SendEmailInput, PrepareDeleteEmailInput, ConfirmDeleteEmailInput, PrepareMoveEmailInput, ConfirmMoveEmailInput, PrepareArchiveEmailInput, ConfirmArchiveEmailInput, PrepareJunkEmailInput, ConfirmJunkEmailInput, PrepareDeleteFolderInput, ConfirmDeleteFolderInput, PrepareEmptyFolderInput, ConfirmEmptyFolderInput, PrepareBatchDeleteEmailsInput, PrepareBatchMoveEmailsInput, ConfirmBatchOperationInput, MarkEmailReadInput, MarkEmailUnreadInput, SetEmailFlagInput, ClearEmailFlagInput, SetEmailCategoriesInput, CreateFolderInput, RenameFolderInput, MoveFolderInput, } from './tools/index.js';
+import { createMailboxOrganizationTools, ListAccountsInput, ListEmailsInput, SearchEmailsInput, GetEmailInput, GetUnreadCountInput, ListAttachmentsInput, DownloadAttachmentInput, ListCalendarsInput, ListEventsInput, GetEventInput, SearchEventsInput, CreateEventInput, RespondToEventInput, DeleteEventInput, UpdateEventInput, ListContactsInput, SearchContactsInput, GetContactInput, ListTasksInput, SearchTasksInput, GetTaskInput, ListNotesInput, GetNoteInput, SearchNotesInput, ListFoldersWithAccountInput, SendEmailInput, ReplyEmailInput, ReplyAllEmailInput, PrepareDeleteEmailInput, ConfirmDeleteEmailInput, PrepareMoveEmailInput, ConfirmMoveEmailInput, PrepareArchiveEmailInput, ConfirmArchiveEmailInput, PrepareJunkEmailInput, ConfirmJunkEmailInput, PrepareDeleteFolderInput, ConfirmDeleteFolderInput, PrepareEmptyFolderInput, ConfirmEmptyFolderInput, PrepareBatchDeleteEmailsInput, PrepareBatchMoveEmailsInput, ConfirmBatchOperationInput, MarkEmailReadInput, MarkEmailUnreadInput, SetEmailFlagInput, ClearEmailFlagInput, SetEmailCategoriesInput, CreateFolderInput, RenameFolderInput, MoveFolderInput, } from './tools/index.js';
 import { ApprovalTokenManager } from './approval/index.js';
 import { wrapError, OutlookNotRunningError, } from './utils/errors.js';
+import { extractPlainText } from './parsers/html-stripper.js';
 // =============================================================================
 // Helper: JSON text result
 // =============================================================================
@@ -25,7 +26,7 @@ function errorResult(message) {
 export function createServer() {
     const server = new McpServer({
         name: 'outlook-mcp',
-        version: '1.1.1',
+        version: '1.1.2',
     });
     const tokenManager = new ApprovalTokenManager();
     let initialized = false;
@@ -252,6 +253,36 @@ export function createServer() {
             message_id: sent.messageId,
             sent_at: sent.sentAt,
             status: 'sent',
+        });
+    }));
+    server.tool('reply_to_email', 'Reply to an existing email in Outlook. Creates a threaded reply to the specified message, sets the reply body, and sends it. Returns the sent message_id and sent_at timestamp. Use get_email to read the original message before replying if needed.', ReplyEmailInput.shape, handle((args) => {
+        if (mailSender == null)
+            return errorResult('Email sending is not available');
+        const params = ReplyEmailInput.parse(args);
+        const sent = mailSender.replyEmail({
+            messageId: params.email_id,
+            body: params.body,
+            bodyType: params.body_type,
+        });
+        return jsonResult({
+            message_id: sent.messageId,
+            sent_at: sent.sentAt,
+            status: 'sent',
+        });
+    }));
+    server.tool('reply_all_email', 'Create a reply-all draft from an existing email in Outlook. Uses the original To/CC recipients so the draft is a true reply-all, and saves it to the Drafts folder without sending. The reply body is prepended to the quoted original message. HTML bodies are converted to plain text. Returns the draft message_id.', ReplyAllEmailInput.shape, handle((args) => {
+        if (mailSender == null)
+            return errorResult('Email sending is not available');
+        const params = ReplyAllEmailInput.parse(args);
+        const replyBody = params.body_type === 'html' ? extractPlainText(params.body) : params.body;
+        const saved = mailSender.replyAllEmail({
+            messageId: params.email_id,
+            body: replyBody,
+            bodyType: 'plain',
+        });
+        return jsonResult({
+            draft_id: saved.messageId,
+            status: 'saved_as_draft',
         });
     }));
     // =========================================================================

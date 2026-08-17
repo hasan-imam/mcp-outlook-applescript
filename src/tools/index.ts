@@ -12,6 +12,8 @@ export {
     ListAttachmentsInput,
     DownloadAttachmentInput,
     SendEmailInput,
+    ReplyEmailInput,
+    ReplyAllEmailInput,
     type ListFoldersParams,
     type ListFoldersWithAccountParams,
     type ListEmailsParams,
@@ -21,6 +23,8 @@ export {
     type ListAttachmentsParams,
     type DownloadAttachmentParams,
     type SendEmailParams,
+    type ReplyEmailParams,
+    type ReplyAllEmailParams,
     type IContentReader,
     nullContentReader,
 } from './mail.js';

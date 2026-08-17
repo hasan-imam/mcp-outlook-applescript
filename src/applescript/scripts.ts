@@ -94,6 +94,20 @@ export interface SendEmailParams {
     readonly accountId?: number;
 }
 
+/** Input parameters for replying to an existing email message. */
+export interface ReplyEmailParams {
+    readonly messageId: number;
+    readonly body: string;
+    readonly bodyType: 'plain' | 'html';
+}
+
+/** Input parameters for creating a reply-all draft. */
+export interface ReplyAllEmailParams {
+    readonly messageId: number;
+    readonly body: string;
+    readonly bodyType: 'plain' | 'html';
+}
+
 // =============================================================================
 // Date Construction Helper
 // =============================================================================
@@ -264,9 +278,10 @@ end tell
 }
 /**
  * Maximum number of messages to scan for sender-address matches.
- * Keeps execution within the 30s AppleScript timeout.
+ * Each message in this loop costs ~0.8s in Apple Events overhead (measured),
+ * so this is capped low enough to fit within searchTimeoutMs even at offset 0.
  */
-const SENDER_SCAN_LIMIT = 500;
+const SENDER_SCAN_LIMIT = 100;
 /**
  * Searches messages by query.
  *
@@ -1639,21 +1654,178 @@ end tell
 `;
 }
 /**
+ * Replies to an existing email message.
+ *
+ * Creates an outgoing message addressed to the original sender rather than
+ * using `reply to`, because Outlook for Mac's `reply to` + `send` places the
+ * message in the Outbox without triggering network transmission.
+ */
+export function replyEmail(params: ReplyEmailParams): string {
+    const escapedBody = escapeForAppleScript(params.body);
+    const contentProperty = params.bodyType === 'html'
+        ? `content:"${escapedBody}"`
+        : `plain text content:"${escapedBody}"`;
+    return `
+tell application "Microsoft Outlook"
+  try
+    set sourceMsg to message id ${params.messageId}
+
+    -- Resolve the original sender's email address.
+    -- The phrase "address of sender of message" fails with a type specifier error,
+    -- so we must first get the sender object into a variable.
+    set senderAddress to ""
+    try
+      set senderObj to sender of sourceMsg
+      set senderAddress to address of senderObj
+    end try
+    if senderAddress is "" then
+      error "Could not determine the sender address of message ${params.messageId}"
+    end if
+
+    -- Build a reply-style subject (preserve an existing Re: prefix)
+    set origSubject to subject of sourceMsg
+    set replySubject to "Re: " & origSubject
+    try
+      if origSubject begins with "Re: " or origSubject begins with "RE: " then
+        set replySubject to origSubject
+      end if
+    end try
+
+    -- Compose the reply as a new outgoing message; this is the only reliable
+    -- way to actually dispatch it from Outlook.
+    set newMessage to make new outgoing message with properties {subject:replySubject, ${contentProperty}}
+    make new to recipient at newMessage with properties {email address:{address:senderAddress}}
+
+    -- Capture ID before send (reference becomes stale after send)
+    set msgId to "" & (id of newMessage)
+    send newMessage
+
+    set sentTime to current date
+    set sentISO to sentTime as «class isot» as string
+
+    -- Return success
+    set output to "{{RECORD}}success{{=}}true{{FIELD}}messageId{{=}}" & msgId & "{{FIELD}}sentAt{{=}}" & sentISO
+    return output
+  on error errMsg
+    -- Return failure
+    set output to "{{RECORD}}success{{=}}false{{FIELD}}error{{=}}" & errMsg
+    return output
+  end try
+end tell
+`;
+}
+
+/**
+ * Creates a reply-all draft for an existing email message.
+ *
+ * Starts with a true `reply to` so the draft is part of the conversation thread,
+ * then copies the original Cc recipients (and original To recipients other than
+ * the sender) into the reply's Cc field. The reply body is prepended to the
+ * quoted original message, the draft is moved to the Drafts folder, and the
+ * resulting draft message id is returned.
+ */
+export function replyAllEmail(params: ReplyAllEmailParams): string {
+    const escapedBody = escapeForAppleScript(params.body);
+    return `
+tell application "Microsoft Outlook"
+  try
+    set sourceMsg to message id ${params.messageId}
+
+    -- Create a true reply in the conversation thread (To is the original sender).
+    set replyMsg to reply to sourceMsg without opening window
+
+    -- Identify the replying account's address so we don't Cc ourselves.
+    set myAddress to email address of account of sourceMsg
+
+    -- Add the original Cc recipients to the reply.
+    repeat with r in cc recipients of sourceMsg
+      try
+        set ea to email address of r
+        set rName to name of ea
+        set rAddr to address of ea
+        if rAddr is not "" then
+          make new cc recipient at replyMsg with properties {email address:{name:rName, address:rAddr}}
+        end if
+      on error
+      end try
+    end repeat
+
+    -- Add the original To recipients (except the replying user) to the reply Cc.
+    repeat with r in to recipients of sourceMsg
+      try
+        set ea to email address of r
+        set rName to name of ea
+        set rAddr to address of ea
+        if rAddr is not "" and rAddr is not equal to myAddress then
+          make new cc recipient at replyMsg with properties {email address:{name:rName, address:rAddr}}
+        end if
+      on error
+      end try
+    end repeat
+
+    -- Capture the quoted original and prepend the user's body.
+    set originalQuote to plain text content of replyMsg
+    set marker to "REPLYALLMARKER-" & (do shell script "uuidgen")
+    set plain text content of replyMsg to "${escapedBody}" & return & return & originalQuote & return & marker
+
+    -- Save the reply as a draft in the default account's Drafts folder.
+    set draftsFolder to mail folder "Drafts" of default account
+    move replyMsg to draftsFolder
+
+    -- The moved message may get a new id/folder reference. Locate it by marker.
+    set foundMsg to missing value
+    set attempt to 0
+    repeat while foundMsg is missing value and attempt < 50
+      repeat with m in messages of draftsFolder
+        try
+          if plain text content of m contains marker then
+            set foundMsg to m
+            exit repeat
+          end if
+        on error
+        end try
+      end repeat
+      if foundMsg is missing value then
+        delay 0.1
+        set attempt to attempt + 1
+      end if
+    end repeat
+
+    if foundMsg is missing value then
+      error "Could not locate saved reply-all draft"
+    end if
+
+    -- Remove the marker and leave the clean draft body.
+    set plain text content of foundMsg to "${escapedBody}" & return & return & originalQuote
+
+    set msgId to id of foundMsg
+    set output to "{{RECORD}}success{{=}}true{{FIELD}}messageId{{=}}" & msgId & "{{FIELD}}draftId{{=}}" & msgId
+    return output
+  on error errMsg
+    -- Return failure
+    set output to "{{RECORD}}success{{=}}false{{FIELD}}error{{=}}" & errMsg
+    return output
+  end try
+end tell
+`;
+}
+
+/**
  * Sends an email with optional CC, BCC, attachments, and account selection.
  */
 export function sendEmail(params: SendEmailParams): string {
     const { to, subject, body, bodyType, cc, bcc, replyTo, attachments, inlineImages, accountId } = params;
     const escapedSubject = escapeForAppleScript(subject);
     const escapedBody = escapeForAppleScript(body);
-    const toRecipients = to.map(email => `    make new recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n');
+    const toRecipients = to.map(email => `    make new to recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n');
     const ccRecipients = cc != null && cc.length > 0
-        ? cc.map(email => `    make new recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}, recipient type:recipient cc}`).join('\n')
+        ? cc.map(email => `    make new cc recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n')
         : '';
     const bccRecipients = bcc != null && bcc.length > 0
-        ? bcc.map(email => `    make new recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}, recipient type:recipient bcc}`).join('\n')
+        ? bcc.map(email => `    make new bcc recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n')
         : '';
     const contentProperty = bodyType === 'html'
-        ? `html content:"${escapedBody}"`
+        ? `content:"${escapedBody}"`
         : `plain text content:"${escapedBody}"`;
     const replyToStatement = replyTo != null
         ? `    set reply to of newMessage to "${escapeForAppleScript(replyTo)}"`

@@ -90,6 +90,16 @@ export const SendEmailInput = z.strictObject({
     })).optional().describe('Inline images for HTML body. If omitted, no inline images are included.'),
     account_id: z.number().int().positive().optional().describe('Account ID to send from (e.g., from list_accounts). If omitted, uses the default account.'),
 });
+export const ReplyEmailInput = z.strictObject({
+    email_id: z.number().int().positive().describe('The numeric ID of the email to reply to (e.g., from list_emails or search_emails)'),
+    body: z.string().min(1).describe('Reply body content — plain text or HTML depending on body_type'),
+    body_type: z.enum(['plain', 'html']).default('plain').describe('Body content type: "plain" for text or "html" for rich formatting. Defaults to "plain" if omitted.'),
+});
+export const ReplyAllEmailInput = z.strictObject({
+    email_id: z.number().int().positive().describe('The numeric ID of the email to reply-all to (e.g., from list_emails or search_emails)'),
+    body: z.string().min(1).describe('Reply body content — will be prepended to the quoted original message as plain text'),
+    body_type: z.enum(['plain', 'html']).default('plain').describe('Body content type: "plain" for text. HTML bodies will be converted to plain text for this draft. Defaults to "plain" if omitted.'),
+});
 // ---------------------------------------------------------------------------
 // Row-to-domain transformers
 // ---------------------------------------------------------------------------
