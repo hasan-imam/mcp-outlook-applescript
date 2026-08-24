@@ -1,11 +1,11 @@
 # mcp-outlook-applescript
 
-A [Model Context Protocol](https://modelcontextprotocol.io/) server for Microsoft Outlook on Mac. Access your mail, calendar, contacts, tasks, and notes through 50 MCP tools powered by AppleScript.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server for Microsoft Outlook on Mac. Access your mail, calendar, contacts, tasks, and notes through 52 MCP tools powered by AppleScript.
 
 ## Features
 
 - **AppleScript backend** — works with classic Outlook for Mac, no network or authentication required
-- **50 tools** — full coverage of mail, calendar, contacts, tasks, and notes
+- **52 tools** — full coverage of mail, calendar, contacts, tasks, and notes
 - **Approval system** — destructive operations (delete, move, junk) require a two-step prepare/confirm flow
 - **Zero native dependencies** — pure TypeScript + AppleScript, no C++ compilation needed
 

@@ -1,6 +1,6 @@
 # mcp-outlook-applescript
 
-MCP server for Microsoft Outlook on Mac. 50 tools for mail, calendar, contacts, tasks, and notes via AppleScript. TypeScript with strict mode, Zod validation, and security-hardened input escaping.
+MCP server for Microsoft Outlook on Mac. 52 tools for mail, calendar, contacts, tasks, and notes via AppleScript. TypeScript with strict mode, Zod validation, and security-hardened input escaping.
 
 ## Commands
 
@@ -18,7 +18,7 @@ MCP server for Microsoft Outlook on Mac. 50 tools for mail, calendar, contacts, 
 | When | Run | What it checks |
 |------|-----|----------------|
 | Any code change | `npm run build && npm test && bash scripts/audit.sh` | Types, 131 unit tests, 28 static checks (security, package, bug-fix preservation) |
-| Before release, or after changing AppleScript/repository/parser | `node scripts/smoke-test.mjs` (Outlook must be running) | Live integration: 46/50 tools via JSON-RPC against real Outlook |
+| Before release, or after changing AppleScript/repository/parser | `node scripts/smoke-test.mjs` (Outlook must be running) | Live integration: 45/52 tools via JSON-RPC against real Outlook |
 | After changing tool descriptions or Zod schemas | Give an MCP client a task without naming tools — it must discover and call them from descriptions | Tool discoverability, schema usability, response format |
 
 ## Architecture
@@ -63,7 +63,7 @@ src/                                 # 34 TypeScript files
 
 ### Data flow
 
-1. `src/index.ts` registers 50 tools on the MCP server with Zod schemas
+1. `src/index.ts` registers 52 tools on the MCP server with Zod schemas
 2. Each handler calls a tool class (`MailTools`, `CalendarTools`, etc.) which calls `IRepository`
 3. `IRepository` (in `applescript/repository.ts`) calls `scripts.ts` to build an AppleScript string
 4. `executor.ts` runs it via `osascript` (stdin, not shell) and returns raw output
@@ -131,7 +131,7 @@ AppleScript outputs are not JSON. Scripts emit records separated by `{{RECORD}}`
 | Dependency | Purpose |
 |------------|---------|
 | `@modelcontextprotocol/sdk` | MCP server framework (stdio transport) |
-| `zod` | Input validation for all 49 tool handlers |
+| `zod` | Input validation for all 52 tool handlers |
 | `typescript` (dev) | Build toolchain (`strict: true`, `ES2022`, `NodeNext`) |
 | `vitest` (dev) | Test runner |
 | `@types/node` (dev) | Node.js type definitions |
