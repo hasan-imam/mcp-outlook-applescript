@@ -118,6 +118,7 @@ export {
     createMailSender,
     type IMailSender,
     type MailSenderParams,
+    type ReplyEmailParams,
     type SentEmail,
     type Attachment,
     type InlineImage,

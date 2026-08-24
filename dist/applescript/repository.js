@@ -125,11 +125,15 @@ export function deduplicateEmailRows(rows) {
 }
 /**
  * Calculate timeout for search operations, scaling with offset.
- * Base 90s (phase 2 sender scan of 500 messages takes ~60s worst case, plus
- * phase 1 whose clause and overhead). +10s per page after the first, capped at 150s.
+ * Base 140s (phase 1 whose-scan ~30-55s + phase 2 bounded sender scan
+ * up to SENDER_SCAN_LIMIT messages at ~0.8s each). +10s per page after
+ * the first, capped at 180s.
  */
 export function searchTimeoutMs(offset) {
-    return Math.min(150000, 90000 + Math.floor(offset / 25) * 10000);
+    // Phase 1 (subject whose-scan) alone measured 30-55s on large mailboxes;
+    // Phase 2 (bounded sender loop) adds up to SENDER_SCAN_LIMIT * ~0.8s.
+    // Base raised from 90s to 140s to give both phases headroom.
+    return Math.min(180000, 140000 + Math.floor(offset / 25) * 10000);
 }
 export class AppleScriptRepository {
     folderCache = new Map();

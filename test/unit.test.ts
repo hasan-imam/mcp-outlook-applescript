@@ -38,6 +38,8 @@ import {
   listEvents,
   buildAppleScriptDateVar,
   sendEmail,
+  createDraft,
+  replyEmail,
   setMessageCategories,
   createMailFolder,
 } from '../src/applescript/scripts.js';
@@ -724,33 +726,33 @@ describe('deduplicateEmailRows', () => {
 // =============================================================================
 
 describe('searchTimeoutMs', () => {
-  it('returns 90s base for offset=0', () => {
-    expect(searchTimeoutMs(0)).toBe(90000);
+  it('returns 140s base for offset=0', () => {
+    expect(searchTimeoutMs(0)).toBe(140000);
   });
 
-  it('returns 100s for offset=25 (page 2)', () => {
-    expect(searchTimeoutMs(25)).toBe(100000);
+  it('returns 150s for offset=25 (page 2)', () => {
+    expect(searchTimeoutMs(25)).toBe(150000);
   });
 
-  it('returns 110s for offset=50 (page 3)', () => {
-    expect(searchTimeoutMs(50)).toBe(110000);
+  it('returns 160s for offset=50 (page 3)', () => {
+    expect(searchTimeoutMs(50)).toBe(160000);
   });
 
-  it('returns 120s for offset=75 (page 4)', () => {
-    expect(searchTimeoutMs(75)).toBe(120000);
+  it('returns 170s for offset=75 (page 4)', () => {
+    expect(searchTimeoutMs(75)).toBe(170000);
   });
 
-  it('caps at 150s for high offsets', () => {
-    expect(searchTimeoutMs(150)).toBe(150000);
-    expect(searchTimeoutMs(300)).toBe(150000);
-    expect(searchTimeoutMs(1000)).toBe(150000);
+  it('caps at 180s for high offsets', () => {
+    expect(searchTimeoutMs(150)).toBe(180000);
+    expect(searchTimeoutMs(300)).toBe(180000);
+    expect(searchTimeoutMs(1000)).toBe(180000);
   });
 
   it('handles fractional pages (offset not multiple of 25)', () => {
-    // offset=24 → Math.floor(24/25) = 0 → 90s
-    expect(searchTimeoutMs(24)).toBe(90000);
-    // offset=26 → Math.floor(26/25) = 1 → 100s
-    expect(searchTimeoutMs(26)).toBe(100000);
+    // offset=24 → Math.floor(24/25) = 0 → 140s
+    expect(searchTimeoutMs(24)).toBe(140000);
+    // offset=26 → Math.floor(26/25) = 1 → 150s
+    expect(searchTimeoutMs(26)).toBe(150000);
   });
 });
 
@@ -883,14 +885,14 @@ describe('sendEmail template escaping', () => {
     expect(script).toContain('reply@example.com');
   });
 
-  it('uses html content property for html bodyType', () => {
+  it('uses content property for html bodyType', () => {
     const script = sendEmail({
       to: ['test@example.com'],
       subject: 'test',
       body: '<h1>Hello</h1>',
       bodyType: 'html',
     });
-    expect(script).toContain('html content:');
+    expect(script).toContain('content:"<h1>Hello</h1>"');
   });
 
   it('uses plain text content property for plain bodyType', () => {
@@ -901,6 +903,124 @@ describe('sendEmail template escaping', () => {
       bodyType: 'plain',
     });
     expect(script).toContain('plain text content:');
+  });
+});
+
+// =============================================================================
+// Create draft email template
+// =============================================================================
+
+describe('createDraft template', () => {
+  it('makes an outgoing message and moves it to Drafts instead of sending', () => {
+    const script = createDraft({
+      to: ['test@example.com'],
+      subject: 'Draft',
+      body: 'Hello',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('set newMessage to make new outgoing message with properties {subject:"Draft", plain text content:');
+    expect(script).toContain('move newMessage to draftsFolder');
+    expect(script).not.toContain('send newMessage');
+    expect(script).toContain('DRAFTMARKER-');
+  });
+
+  it('escapes recipient, subject, and body values', () => {
+    const script = createDraft({
+      to: ['to"@example.com'],
+      subject: 'He said "hello"',
+      body: 'He said "hello"',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('\\"hello\\"');
+    expect(script).toContain('to\\"@example.com');
+  });
+
+  it('uses content property for html bodyType', () => {
+    const script = createDraft({
+      to: ['test@example.com'],
+      subject: 'test',
+      body: '<h1>Hello</h1>',
+      bodyType: 'html',
+    });
+    expect(script).toContain('content:"<h1>Hello</h1>"');
+    expect(script).toContain('set content of foundMsg to "<h1>Hello</h1>"');
+  });
+
+  it('uses plain text content property for plain bodyType', () => {
+    const script = createDraft({
+      to: ['test@example.com'],
+      subject: 'test',
+      body: 'Hello',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('plain text content:');
+    expect(script).toContain('set plain text content of foundMsg to "Hello"');
+  });
+});
+
+// =============================================================================
+// Reply to email template
+// =============================================================================
+
+describe('replyEmail template', () => {
+  it('fetches the source message and resolves its sender', () => {
+    const script = replyEmail({
+      messageId: 29566,
+      body: 'Thanks, see below.',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('set sourceMsg to message id 29566');
+    expect(script).toContain('set senderObj to sender of sourceMsg');
+    expect(script).toContain('set senderAddress to address of senderObj');
+    expect(script).toContain('if senderAddress is "" then');
+  });
+
+  it('prefixes Re: to the original subject', () => {
+    const script = replyEmail({
+      messageId: 1,
+      body: 'Plain reply',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('set replySubject to "Re: " & origSubject');
+  });
+
+  it('creates an outgoing message (not reply to) and sends it', () => {
+    const script = replyEmail({
+      messageId: 29566,
+      body: 'Thanks, see below.',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('set newMessage to make new outgoing message with properties {subject:replySubject, plain text content:');
+    expect(script).toContain('make new to recipient at newMessage with properties {email address:{address:senderAddress}}');
+    expect(script).toContain('send newMessage');
+    expect(script).not.toContain('reply to sourceMsg');
+  });
+
+  it('uses plain text content for plain bodyType', () => {
+    const script = replyEmail({
+      messageId: 1,
+      body: 'Plain reply',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('plain text content:"Plain reply"');
+  });
+
+  it('uses content for html bodyType', () => {
+    const script = replyEmail({
+      messageId: 1,
+      body: '<p>HTML reply</p>',
+      bodyType: 'html',
+    });
+    expect(script).toContain('content:"<p>HTML reply</p>"');
+  });
+
+  it('escapes body content with quotes', () => {
+    const script = replyEmail({
+      messageId: 1,
+      body: 'He said "hello"',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('He said \\"hello\\"');
   });
 });
 

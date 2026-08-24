@@ -3,8 +3,8 @@
 // smoke-test.mjs — Comprehensive MCP smoke test harness (9 suites)
 //
 // Spawns dist/index.js as a child process, performs the MCP JSON-RPC handshake,
-// then tests across 9 suites covering 45 of 49 tools live.
-// (4 skipped: send_email, download_attachment, respond_to_event, update_event).
+// then tests across 9 suites covering 45 of 52 tools live.
+// (5 skipped: send_email, create_draft, download_attachment, respond_to_event, update_event).
 //
 // Requirements: Outlook must be running. dist/ must be built.
 // Usage: node scripts/smoke-test.mjs
@@ -383,20 +383,20 @@ async function run() {
 
     notify('notifications/initialized');
 
-    // Test 2: tools/list returns 49 tools
+    // Test 2: tools/list returns 52 tools
     const t0Tools = Date.now();
     let toolsList;
     try {
         toolsList = await request('tools/list');
     } catch (err) {
-        fail('tools/list returns 49 tools', err.message, Date.now() - t0Tools);
+        fail('tools/list returns 52 tools', err.message, Date.now() - t0Tools);
         stopServer();
         process.exit(1);
     }
 
     const tools = toolsList.result?.tools;
     if (!Array.isArray(tools)) {
-        fail('tools/list returns 49 tools', 'Expected tools array', Date.now() - t0Tools);
+        fail('tools/list returns 52 tools', 'Expected tools array', Date.now() - t0Tools);
         stopServer();
         process.exit(1);
     }
@@ -409,7 +409,7 @@ async function run() {
         'list_contacts', 'search_contacts', 'get_contact',
         'list_tasks', 'search_tasks', 'get_task',
         'list_notes', 'get_note', 'search_notes',
-        'send_email',
+        'send_email', 'create_draft', 'reply_to_email', 'reply_all_email',
         'prepare_delete_email', 'confirm_delete_email',
         'prepare_move_email', 'confirm_move_email',
         'prepare_archive_email', 'confirm_archive_email',
@@ -429,16 +429,16 @@ async function run() {
     const allHaveDesc = tools.every(t => t.description);
     const allHaveSchema = tools.every(t => t.inputSchema);
 
-    if (tools.length === 49 && missing.length === 0 && extra.length === 0 && allHaveDesc && allHaveSchema) {
-        pass('tools/list returns 49 tools', `${tools.length} tools, all with description + inputSchema`, Date.now() - t0Tools);
+    if (tools.length === 50 && missing.length === 0 && extra.length === 0 && allHaveDesc && allHaveSchema) {
+        pass('tools/list returns 52 tools', `${tools.length} tools, all with description + inputSchema`, Date.now() - t0Tools);
     } else {
         const issues = [];
-        if (tools.length !== 49) issues.push(`count=${tools.length}`);
+        if (tools.length !== 50) issues.push(`count=${tools.length}`);
         if (missing.length > 0) issues.push(`missing: ${missing.join(', ')}`);
         if (extra.length > 0) issues.push(`extra: ${extra.join(', ')}`);
         if (!allHaveDesc) issues.push('some lack description');
         if (!allHaveSchema) issues.push('some lack inputSchema');
-        fail('tools/list returns 49 tools', issues.join('; '), Date.now() - t0Tools);
+        fail('tools/list returns 52 tools', issues.join('; '), Date.now() - t0Tools);
     }
 
     // =========================================================================
