@@ -38,6 +38,7 @@ import {
   listEvents,
   buildAppleScriptDateVar,
   sendEmail,
+  createDraft,
   replyEmail,
   setMessageCategories,
   createMailFolder,
@@ -902,6 +903,58 @@ describe('sendEmail template escaping', () => {
       bodyType: 'plain',
     });
     expect(script).toContain('plain text content:');
+  });
+});
+
+// =============================================================================
+// Create draft email template
+// =============================================================================
+
+describe('createDraft template', () => {
+  it('makes an outgoing message and moves it to Drafts instead of sending', () => {
+    const script = createDraft({
+      to: ['test@example.com'],
+      subject: 'Draft',
+      body: 'Hello',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('set newMessage to make new outgoing message with properties {subject:"Draft", plain text content:');
+    expect(script).toContain('move newMessage to draftsFolder');
+    expect(script).not.toContain('send newMessage');
+    expect(script).toContain('DRAFTMARKER-');
+  });
+
+  it('escapes recipient, subject, and body values', () => {
+    const script = createDraft({
+      to: ['to"@example.com'],
+      subject: 'He said "hello"',
+      body: 'He said "hello"',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('\\"hello\\"');
+    expect(script).toContain('to\\"@example.com');
+  });
+
+  it('uses content property for html bodyType', () => {
+    const script = createDraft({
+      to: ['test@example.com'],
+      subject: 'test',
+      body: '<h1>Hello</h1>',
+      bodyType: 'html',
+    });
+    expect(script).toContain('content:"<h1>Hello</h1>"');
+    expect(script).toContain('set content of foundMsg to "<h1>Hello</h1>"');
+  });
+
+  it('uses plain text content property for plain bodyType', () => {
+    const script = createDraft({
+      to: ['test@example.com'],
+      subject: 'test',
+      body: 'Hello',
+      bodyType: 'plain',
+    });
+    expect(script).toContain('plain text content:');
+    expect(script).toContain('set plain text content of foundMsg to "Hello"');
   });
 });
 

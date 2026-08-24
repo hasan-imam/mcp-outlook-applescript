@@ -53,6 +53,7 @@ import {
     SearchNotesInput,
     ListFoldersWithAccountInput,
     SendEmailInput,
+    CreateDraftInput,
     ReplyEmailInput,
     ReplyAllEmailInput,
     PrepareDeleteEmailInput,
@@ -106,7 +107,7 @@ function errorResult(message: string) {
 export function createServer(): McpServer {
     const server = new McpServer({
         name: 'outlook-mcp',
-        version: '1.1.2',
+        version: '1.1.3',
     });
 
     const tokenManager = new ApprovalTokenManager();
@@ -438,6 +439,36 @@ export function createServer(): McpServer {
                 message_id: sent.messageId,
                 sent_at: sent.sentAt,
                 status: 'sent',
+            });
+        }),
+    );
+
+    server.tool('create_draft', 'Create a new email draft in Outlook without sending it. Supports To, CC, BCC, file attachments, inline images, and HTML formatting. The draft is saved to the Drafts folder and can be reviewed and sent from Outlook. Returns the draft message_id. Use list_accounts to find account_id if using a non-default account. Returns an error if required fields (to, subject) are missing or if attachment file paths do not exist.',
+        CreateDraftInput.shape,
+        handle((args) => {
+            if (mailSender == null) return errorResult('Email sending is not available');
+            const params = CreateDraftInput.parse(args);
+            const draftParams: MailSenderParams = {
+                to: params.to,
+                subject: params.subject,
+                body: params.body,
+                bodyType: params.body_type,
+                ...(params.cc != null && { cc: params.cc }),
+                ...(params.bcc != null && { bcc: params.bcc }),
+                ...(params.reply_to != null && { replyTo: params.reply_to }),
+                ...(params.attachments != null && { attachments: params.attachments }),
+                ...(params.inline_images != null && {
+                    inlineImages: params.inline_images.map(img => ({
+                        path: img.path,
+                        contentId: img.content_id,
+                    })),
+                }),
+                ...(params.account_id != null && { accountId: params.account_id }),
+            };
+            const saved = mailSender.createDraft(draftParams);
+            return jsonResult({
+                draft_id: saved.draftId,
+                status: 'saved_as_draft',
             });
         }),
     );

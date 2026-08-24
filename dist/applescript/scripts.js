@@ -1773,3 +1773,111 @@ ${inlineImageStatements}
 end tell
 `;
 }
+/**
+ * Creates a new outgoing message draft without sending it.
+ *
+ * The message is saved to the default account's Drafts folder. A temporary
+ * marker is embedded so the message can be located after the `move` operation,
+ * then the marker is removed and the clean body is restored.
+ */
+export function createDraft(params) {
+    const { to, subject, body, bodyType, cc, bcc, replyTo, attachments, inlineImages, accountId } = params;
+    const escapedSubject = escapeForAppleScript(subject);
+    const escapedBody = escapeForAppleScript(body);
+    const toRecipients = to.map(email => `    make new to recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n');
+    const ccRecipients = cc != null && cc.length > 0
+        ? cc.map(email => `    make new cc recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n')
+        : '';
+    const bccRecipients = bcc != null && bcc.length > 0
+        ? bcc.map(email => `    make new bcc recipient at newMessage with properties {email address:{address:"${escapeForAppleScript(email)}"}}`).join('\n')
+        : '';
+    const contentProperty = bodyType === 'html'
+        ? `content:"${escapedBody}"`
+        : `plain text content:"${escapedBody}"`;
+    const isHtml = bodyType === 'html' ? 'true' : 'false';
+    const replyToStatement = replyTo != null
+        ? `    set reply to of newMessage to "${escapeForAppleScript(replyTo)}"`
+        : '';
+    const attachmentStatements = attachments != null && attachments.length > 0
+        ? attachments.map(att => `    make new attachment at newMessage with properties {file:(POSIX file "${escapeForAppleScript(att.path)}")}`).join('\n')
+        : '';
+    const inlineImageStatements = inlineImages != null && inlineImages.length > 0
+        ? inlineImages.map((img, i) => `    set inlineAttach${i} to make new attachment at newMessage with properties {file:(POSIX file "${escapeForAppleScript(img.path)}")}\n` +
+            `    try\n` +
+            `      set content id of inlineAttach${i} to "${escapeForAppleScript(img.contentId)}"\n` +
+            `    end try`).join('\n')
+        : '';
+    const accountStatement = accountId != null
+        ? `    set sending account of newMessage to account id ${accountId}`
+        : '';
+    return `
+tell application "Microsoft Outlook"
+  try
+    set newMessage to make new outgoing message with properties {subject:"${escapedSubject}", ${contentProperty}}
+
+${toRecipients}
+${ccRecipients}
+${bccRecipients}
+${replyToStatement}
+${accountStatement}
+${attachmentStatements}
+${inlineImageStatements}
+
+    set uuid to do shell script "uuidgen"
+    set marker to "DRAFTMARKER-" & uuid
+
+    -- Embed marker so we can locate the message after the move.
+    if ${isHtml} then
+      set content of newMessage to (content of newMessage) & "<p style=\\"display:none\\">" & marker & "</p>"
+      try
+        set plain text content of newMessage to (plain text content of newMessage) & return & return & marker
+      on error
+      end try
+    else
+      set plain text content of newMessage to (plain text content of newMessage) & return & return & marker
+    end if
+
+    -- Save as draft in the default account's Drafts folder.
+    set draftsFolder to mail folder "Drafts" of default account
+    move newMessage to draftsFolder
+
+    -- Locate the moved message by the marker.
+    set foundMsg to missing value
+    set attempt to 0
+    repeat while foundMsg is missing value and attempt < 50
+      repeat with m in messages of draftsFolder
+        try
+          if plain text content of m contains marker then
+            set foundMsg to m
+            exit repeat
+          end if
+        on error
+        end try
+      end repeat
+      if foundMsg is missing value then
+        delay 0.1
+        set attempt to attempt + 1
+      end if
+    end repeat
+
+    if foundMsg is missing value then
+      error "Could not locate saved draft"
+    end if
+
+    -- Remove the marker and restore the clean body.
+    if ${isHtml} then
+      set content of foundMsg to "${escapedBody}"
+    else
+      set plain text content of foundMsg to "${escapedBody}"
+    end if
+
+    set msgId to "" & (id of foundMsg)
+    set output to "{{RECORD}}success{{=}}true{{FIELD}}messageId{{=}}" & msgId & "{{FIELD}}draftId{{=}}" & msgId
+    return output
+  on error errMsg
+    set output to "{{RECORD}}success{{=}}false{{FIELD}}error{{=}}" & errMsg
+    return output
+  end try
+end tell
+`;
+}

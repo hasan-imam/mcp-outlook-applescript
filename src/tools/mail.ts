@@ -105,6 +105,25 @@ export const SendEmailInput = z.strictObject({
     account_id: z.number().int().positive().optional().describe('Account ID to send from (e.g., from list_accounts). If omitted, uses the default account.'),
 });
 
+export const CreateDraftInput = z.strictObject({
+    to: z.array(z.string().min(1)).min(1).describe('Recipient email addresses (e.g., ["user@example.com"])'),
+    subject: z.string().min(1).describe('Email subject line (e.g., "Meeting follow-up")'),
+    body: z.string().describe('Email body content — plain text or HTML depending on body_type'),
+    body_type: z.enum(['plain', 'html']).default('plain').describe('Body content type: "plain" for text or "html" for rich formatting. Defaults to "plain" if omitted.'),
+    cc: z.array(z.string().min(1)).optional().describe('CC recipient email addresses. If omitted, no CC recipients are added.'),
+    bcc: z.array(z.string().min(1)).optional().describe('BCC recipient email addresses. If omitted, no BCC recipients are added.'),
+    reply_to: z.string().optional().describe('Reply-to email address. If omitted, replies go to the sender address.'),
+    attachments: z.array(z.strictObject({
+        path: z.string().min(1).describe('Absolute file path to attachment (e.g., "/Users/me/report.pdf")'),
+        name: z.string().optional().describe('Display name for attachment. If omitted, uses the filename.'),
+    })).optional().describe('File attachments to include. If omitted, no files are attached.'),
+    inline_images: z.array(z.strictObject({
+        path: z.string().min(1).describe('Absolute file path to the image (e.g., "/Users/me/logo.png")'),
+        content_id: z.string().min(1).describe('Content ID for referencing in HTML body via cid: (e.g., "logo1")'),
+    })).optional().describe('Inline images for HTML body. If omitted, no inline images are included.'),
+    account_id: z.number().int().positive().optional().describe('Account ID to use (e.g., from list_accounts). If omitted, uses the default account.'),
+});
+
 export const ReplyEmailInput = z.strictObject({
     email_id: z.number().int().positive().describe('The numeric ID of the email to reply to (e.g., from list_emails or search_emails)'),
     body: z.string().min(1).describe('Reply body content — plain text or HTML depending on body_type'),
@@ -135,6 +154,8 @@ export type ListAttachmentsParams = z.infer<typeof ListAttachmentsInput>;
 export type DownloadAttachmentParams = z.infer<typeof DownloadAttachmentInput>;
 /** Validated parameters for sending an email. */
 export type SendEmailParams = z.infer<typeof SendEmailInput>;
+/** Validated parameters for creating an outgoing message draft. */
+export type CreateDraftParams = z.infer<typeof CreateDraftInput>;
 /** Validated parameters for replying to an email. */
 export type ReplyEmailParams = z.infer<typeof ReplyEmailInput>;
 /** Validated parameters for creating a reply-all draft. */

@@ -13,7 +13,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server for Microsof
 
 | Category | Tools |
 |----------|-------|
-| **Mail** | `list_folders`, `list_emails`, `search_emails`, `get_email`, `get_unread_count`, `send_email`, `reply_to_email`, `reply_all_email`, `list_attachments`, `download_attachment` |
+| **Mail** | `list_folders`, `list_emails`, `search_emails`, `get_email`, `get_unread_count`, `send_email`, `create_draft`, `reply_to_email`, `reply_all_email`, `list_attachments`, `download_attachment` |
 | **Mail Organization** | `mark_email_read`, `mark_email_unread`, `set_email_flag`, `clear_email_flag`, `set_email_categories`, `prepare/confirm_delete_email`, `prepare/confirm_move_email`, `prepare/confirm_archive_email`, `prepare/confirm_junk_email`, `prepare/confirm_batch_*` |
 | **Folders** | `create_folder`, `rename_folder`, `move_folder`, `prepare/confirm_delete_folder`, `prepare/confirm_empty_folder` |
 | **Calendar** | `list_calendars`, `list_events`, `get_event`, `search_events`, `create_event`, `update_event`, `delete_event`, `respond_to_event` |

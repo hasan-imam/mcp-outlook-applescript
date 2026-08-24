@@ -7,7 +7,7 @@ import { createCalendarTools } from './tools/calendar.js';
 import { createContactsTools } from './tools/contacts.js';
 import { createTasksTools } from './tools/tasks.js';
 import { createNotesTools } from './tools/notes.js';
-import { createMailboxOrganizationTools, ListAccountsInput, ListEmailsInput, SearchEmailsInput, GetEmailInput, GetUnreadCountInput, ListAttachmentsInput, DownloadAttachmentInput, ListCalendarsInput, ListEventsInput, GetEventInput, SearchEventsInput, CreateEventInput, RespondToEventInput, DeleteEventInput, UpdateEventInput, ListContactsInput, SearchContactsInput, GetContactInput, ListTasksInput, SearchTasksInput, GetTaskInput, ListNotesInput, GetNoteInput, SearchNotesInput, ListFoldersWithAccountInput, SendEmailInput, ReplyEmailInput, ReplyAllEmailInput, PrepareDeleteEmailInput, ConfirmDeleteEmailInput, PrepareMoveEmailInput, ConfirmMoveEmailInput, PrepareArchiveEmailInput, ConfirmArchiveEmailInput, PrepareJunkEmailInput, ConfirmJunkEmailInput, PrepareDeleteFolderInput, ConfirmDeleteFolderInput, PrepareEmptyFolderInput, ConfirmEmptyFolderInput, PrepareBatchDeleteEmailsInput, PrepareBatchMoveEmailsInput, ConfirmBatchOperationInput, MarkEmailReadInput, MarkEmailUnreadInput, SetEmailFlagInput, ClearEmailFlagInput, SetEmailCategoriesInput, CreateFolderInput, RenameFolderInput, MoveFolderInput, } from './tools/index.js';
+import { createMailboxOrganizationTools, ListAccountsInput, ListEmailsInput, SearchEmailsInput, GetEmailInput, GetUnreadCountInput, ListAttachmentsInput, DownloadAttachmentInput, ListCalendarsInput, ListEventsInput, GetEventInput, SearchEventsInput, CreateEventInput, RespondToEventInput, DeleteEventInput, UpdateEventInput, ListContactsInput, SearchContactsInput, GetContactInput, ListTasksInput, SearchTasksInput, GetTaskInput, ListNotesInput, GetNoteInput, SearchNotesInput, ListFoldersWithAccountInput, SendEmailInput, CreateDraftInput, ReplyEmailInput, ReplyAllEmailInput, PrepareDeleteEmailInput, ConfirmDeleteEmailInput, PrepareMoveEmailInput, ConfirmMoveEmailInput, PrepareArchiveEmailInput, ConfirmArchiveEmailInput, PrepareJunkEmailInput, ConfirmJunkEmailInput, PrepareDeleteFolderInput, ConfirmDeleteFolderInput, PrepareEmptyFolderInput, ConfirmEmptyFolderInput, PrepareBatchDeleteEmailsInput, PrepareBatchMoveEmailsInput, ConfirmBatchOperationInput, MarkEmailReadInput, MarkEmailUnreadInput, SetEmailFlagInput, ClearEmailFlagInput, SetEmailCategoriesInput, CreateFolderInput, RenameFolderInput, MoveFolderInput, } from './tools/index.js';
 import { ApprovalTokenManager } from './approval/index.js';
 import { wrapError, OutlookNotRunningError, } from './utils/errors.js';
 import { extractPlainText } from './parsers/html-stripper.js';
@@ -26,7 +26,7 @@ function errorResult(message) {
 export function createServer() {
     const server = new McpServer({
         name: 'outlook-mcp',
-        version: '1.1.2',
+        version: '1.1.3',
     });
     const tokenManager = new ApprovalTokenManager();
     let initialized = false;
@@ -253,6 +253,33 @@ export function createServer() {
             message_id: sent.messageId,
             sent_at: sent.sentAt,
             status: 'sent',
+        });
+    }));
+    server.tool('create_draft', 'Create a new email draft in Outlook without sending it. Supports To, CC, BCC, file attachments, inline images, and HTML formatting. The draft is saved to the Drafts folder and can be reviewed and sent from Outlook. Returns the draft message_id. Use list_accounts to find account_id if using a non-default account. Returns an error if required fields (to, subject) are missing or if attachment file paths do not exist.', CreateDraftInput.shape, handle((args) => {
+        if (mailSender == null)
+            return errorResult('Email sending is not available');
+        const params = CreateDraftInput.parse(args);
+        const draftParams = {
+            to: params.to,
+            subject: params.subject,
+            body: params.body,
+            bodyType: params.body_type,
+            ...(params.cc != null && { cc: params.cc }),
+            ...(params.bcc != null && { bcc: params.bcc }),
+            ...(params.reply_to != null && { replyTo: params.reply_to }),
+            ...(params.attachments != null && { attachments: params.attachments }),
+            ...(params.inline_images != null && {
+                inlineImages: params.inline_images.map(img => ({
+                    path: img.path,
+                    contentId: img.content_id,
+                })),
+            }),
+            ...(params.account_id != null && { accountId: params.account_id }),
+        };
+        const saved = mailSender.createDraft(draftParams);
+        return jsonResult({
+            draft_id: saved.draftId,
+            status: 'saved_as_draft',
         });
     }));
     server.tool('reply_to_email', 'Reply to an existing email in Outlook. Creates a threaded reply to the specified message, sets the reply body, and sends it. Returns the sent message_id and sent_at timestamp. Use get_email to read the original message before replying if needed.', ReplyEmailInput.shape, handle((args) => {

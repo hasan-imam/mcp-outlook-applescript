@@ -1,6 +1,6 @@
 # mcp-outlook-applescript
 
-MCP server for Microsoft Outlook on Mac. 49 tools for mail, calendar, contacts, tasks, and notes via AppleScript. TypeScript with strict mode, Zod validation, and security-hardened input escaping.
+MCP server for Microsoft Outlook on Mac. 50 tools for mail, calendar, contacts, tasks, and notes via AppleScript. TypeScript with strict mode, Zod validation, and security-hardened input escaping.
 
 ## Commands
 
@@ -8,7 +8,7 @@ MCP server for Microsoft Outlook on Mac. 49 tools for mail, calendar, contacts, 
 |---------|---------|
 | `npm run build` | Compile TypeScript to `dist/` and set shebang |
 | `npm run typecheck` | Type-check without emitting |
-| `npm test` | Run 121 unit tests (vitest, no Outlook needed) |
+| `npm test` | Run 131 unit tests (vitest, no Outlook needed) |
 | `bash scripts/audit.sh` | 28 static quality checks (build, security, package, functional) |
 | `node scripts/doc-quality.mjs` | Score all 49 tool descriptions against 6-criterion rubric |
 | `node scripts/smoke-test.mjs` | Live integration tests (requires Outlook running) |
@@ -17,8 +17,8 @@ MCP server for Microsoft Outlook on Mac. 49 tools for mail, calendar, contacts, 
 
 | When | Run | What it checks |
 |------|-----|----------------|
-| Any code change | `npm run build && npm test && bash scripts/audit.sh` | Types, 121 unit tests, 28 static checks (security, package, bug-fix preservation) |
-| Before release, or after changing AppleScript/repository/parser | `node scripts/smoke-test.mjs` (Outlook must be running) | Live integration: 45/49 tools via JSON-RPC against real Outlook |
+| Any code change | `npm run build && npm test && bash scripts/audit.sh` | Types, 131 unit tests, 28 static checks (security, package, bug-fix preservation) |
+| Before release, or after changing AppleScript/repository/parser | `node scripts/smoke-test.mjs` (Outlook must be running) | Live integration: 46/50 tools via JSON-RPC against real Outlook |
 | After changing tool descriptions or Zod schemas | Give an MCP client a task without naming tools — it must discover and call them from descriptions | Tool discoverability, schema usability, response format |
 
 ## Architecture
@@ -63,7 +63,7 @@ src/                                 # 34 TypeScript files
 
 ### Data flow
 
-1. `src/index.ts` registers 49 tools on the MCP server with Zod schemas
+1. `src/index.ts` registers 50 tools on the MCP server with Zod schemas
 2. Each handler calls a tool class (`MailTools`, `CalendarTools`, etc.) which calls `IRepository`
 3. `IRepository` (in `applescript/repository.ts`) calls `scripts.ts` to build an AppleScript string
 4. `executor.ts` runs it via `osascript` (stdin, not shell) and returns raw output

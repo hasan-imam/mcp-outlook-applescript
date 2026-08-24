@@ -102,6 +102,59 @@ export class AppleScriptMailSender {
             sentAt: result.sentAt ?? '',
         };
     }
+    /**
+     * Creates a new outgoing message draft and saves it to the Drafts folder.
+     * @param params - Email composition parameters (same as sendEmail).
+     * @returns The saved draft's message ID.
+     * @throws AttachmentNotFoundError if any attachment or inline image path does not exist.
+     * @throws MailSendError if Outlook reports a failure saving the draft.
+     */
+    createDraft(params) {
+        if (params.attachments != null) {
+            for (const attachment of params.attachments) {
+                if (!existsSync(attachment.path)) {
+                    throw new AttachmentNotFoundError(attachment.path);
+                }
+            }
+        }
+        if (params.inlineImages != null) {
+            for (const image of params.inlineImages) {
+                if (!existsSync(image.path)) {
+                    throw new AttachmentNotFoundError(image.path);
+                }
+            }
+        }
+        let scriptParams = {
+            to: params.to,
+            subject: params.subject,
+            body: params.body,
+            bodyType: params.bodyType,
+        };
+        if (params.cc != null)
+            scriptParams = { ...scriptParams, cc: params.cc };
+        if (params.bcc != null)
+            scriptParams = { ...scriptParams, bcc: params.bcc };
+        if (params.replyTo != null)
+            scriptParams = { ...scriptParams, replyTo: params.replyTo };
+        if (params.attachments != null)
+            scriptParams = { ...scriptParams, attachments: params.attachments };
+        if (params.inlineImages != null)
+            scriptParams = { ...scriptParams, inlineImages: params.inlineImages };
+        if (params.accountId != null)
+            scriptParams = { ...scriptParams, accountId: params.accountId };
+        const script = scripts.createDraft(scriptParams);
+        const output = executeAppleScriptOrThrow(script);
+        const result = parseSendEmailResult(output);
+        if (result == null) {
+            throw new AppleScriptError('Failed to parse create draft response');
+        }
+        if (!result.success) {
+            throw new MailSendError(result.error ?? 'Unknown error');
+        }
+        return {
+            draftId: result.messageId ?? '',
+        };
+    }
 }
 /** Creates a new AppleScriptMailSender instance. */
 export function createMailSender() {
