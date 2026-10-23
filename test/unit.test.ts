@@ -36,6 +36,7 @@ import {
   searchEvents,
   searchNotes,
   listEvents,
+  respondToEvent,
   buildAppleScriptDateVar,
   sendEmail,
   setMessageCategories,
@@ -627,6 +628,35 @@ describe('Date filtering in searchEvents', () => {
   it('extends whose clause with both after and before', () => {
     const script = searchEvents('standup', 10, 0, '2025-01-01T00:00:00Z', '2025-12-31T23:59:59Z');
     expect(script).toContain('subject contains "standup" and start time ≥ afterDate and start time ≤ beforeDate');
+  });
+});
+
+// =============================================================================
+// Calendar RSVP response
+// =============================================================================
+
+describe('respondToEvent', () => {
+  it('uses Outlook native decline meeting command with response notification', () => {
+    const script = respondToEvent({
+      eventId: 123,
+      response: 'decline',
+      sendResponse: true,
+    });
+    expect(script).toContain('set myEvent to calendar event id 123');
+    expect(script).toContain('decline meeting myEvent sending response true');
+    expect(script).not.toContain('set response status of myEvent');
+  });
+
+  it('uses Outlook native tentative command and escapes comments', () => {
+    const script = respondToEvent({
+      eventId: 456,
+      response: 'tentative',
+      sendResponse: false,
+      comment: 'Cannot make this "early"',
+    });
+    expect(script).toContain('accept tentatively meeting myEvent comment');
+    expect(script).toContain('sending response false');
+    expect(script).toContain('Cannot make this \\"early\\"');
   });
 });
 
