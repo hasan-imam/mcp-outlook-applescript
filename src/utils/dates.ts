@@ -55,7 +55,16 @@ export function isoToAppleTimestamp(isoString: string | null | undefined): numbe
  * @param date - Date object, or null/undefined
  * @returns Seconds since Apple epoch (2001-01-01), or null if input is null/undefined
  */
-/** Decomposes an ISO 8601 string into individual UTC date/time components. */
+/**
+ * Decomposes an ISO 8601 string into local date/time components.
+ *
+ * AppleScript's `date` object setters (year/month/day/hours/minutes) operate
+ * in the system's local timezone, not UTC. Callers feed these components
+ * into AppleScript to build a date — so they must be local-time components
+ * (not UTC) for the resulting AppleScript date to represent the correct
+ * instant. Using UTC components here previously caused events to be off by
+ * the local UTC offset (e.g. stored an hour early in CET/UTC+1).
+ */
 export function isoToDateComponents(isoString: string): {
     year: number;
     month: number;
@@ -65,10 +74,10 @@ export function isoToDateComponents(isoString: string): {
 } {
     const date = new Date(isoString);
     return {
-        year: date.getUTCFullYear(),
-        month: date.getUTCMonth() + 1,
-        day: date.getUTCDate(),
-        hours: date.getUTCHours(),
-        minutes: date.getUTCMinutes(),
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        day: date.getDate(),
+        hours: date.getHours(),
+        minutes: date.getMinutes(),
     };
 }
