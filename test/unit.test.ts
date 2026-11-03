@@ -19,6 +19,15 @@
 
 import { describe, it, expect } from 'vitest';
 
+// isoToDateComponents / buildAppleScriptDateVar intentionally decompose ISO
+// dates into LOCAL time components, because AppleScript's date object
+// setters (year/month/day/hours/minutes) operate in the system's local
+// timezone, not UTC — the generated script must use local components to
+// represent the correct instant. Pin a fixed zone so date-component
+// assertions below are deterministic regardless of the machine/CI running
+// the tests.
+process.env.TZ = 'Europe/Warsaw';
+
 // ---------------------------------------------------------------------------
 // Imports under test
 // ---------------------------------------------------------------------------
@@ -40,7 +49,11 @@ import {
   sendEmail,
   setMessageCategories,
   createMailFolder,
+  updateEvent,
 } from '../src/applescript/scripts.js';
+
+// account-scripts.ts -- multi-account folder listing
+import { listMailFoldersByAccounts } from '../src/applescript/account-scripts.js';
 
 // executor.ts -- security-critical escaping
 import { escapeForAppleScript } from '../src/applescript/executor.js';
@@ -226,11 +239,12 @@ describe('Bug 3: listEventsByDateRange uses server-side date filtering', () => {
   });
 
   it('generates correct date variable construction', () => {
+    // 2025-06-15T14:30:00Z is 2025-06-15 16:30 in Europe/Warsaw (CEST, UTC+2)
     const script = listEvents(null, '2025-06-15T14:30:00Z', null, 10, 0);
     expect(script).toContain('set year of afterDate to 2025');
     expect(script).toContain('set month of afterDate to 6');
     expect(script).toContain('set day of afterDate to 15');
-    expect(script).toContain('set hours of afterDate to 14');
+    expect(script).toContain('set hours of afterDate to 16');
     expect(script).toContain('set minutes of afterDate to 30');
   });
 
@@ -530,22 +544,24 @@ describe('Offset support in search AppleScript templates', () => {
 
 describe('buildAppleScriptDateVar', () => {
   it('generates correct date components from ISO string', () => {
+    // 2025-06-15T14:30:00Z is 2025-06-15 16:30 in Europe/Warsaw (CEST, UTC+2)
     const result = buildAppleScriptDateVar('afterDate', '2025-06-15T14:30:00Z');
     expect(result).toContain('set afterDate to current date');
     expect(result).toContain('set year of afterDate to 2025');
     expect(result).toContain('set month of afterDate to 6');
     expect(result).toContain('set day of afterDate to 15');
-    expect(result).toContain('set hours of afterDate to 14');
+    expect(result).toContain('set hours of afterDate to 16');
     expect(result).toContain('set minutes of afterDate to 30');
     expect(result).toContain('set seconds of afterDate to 0');
   });
 
   it('handles midnight correctly', () => {
+    // 2025-01-01T00:00:00Z is 2025-01-01 01:00 in Europe/Warsaw (CET, UTC+1)
     const result = buildAppleScriptDateVar('beforeDate', '2025-01-01T00:00:00Z');
     expect(result).toContain('set year of beforeDate to 2025');
     expect(result).toContain('set month of beforeDate to 1');
     expect(result).toContain('set day of beforeDate to 1');
-    expect(result).toContain('set hours of beforeDate to 0');
+    expect(result).toContain('set hours of beforeDate to 1');
     expect(result).toContain('set minutes of beforeDate to 0');
   });
 
@@ -572,10 +588,11 @@ describe('Date filtering in listMessages', () => {
   });
 
   it('generates whose clause with time received <= beforeDate', () => {
+    // 2025-12-31T23:59:59Z is 2026-01-01 00:59 in Europe/Warsaw (CET, UTC+1)
     const script = listMessages(100, 10, 0, false, undefined, '2025-12-31T23:59:59Z');
     expect(script).toContain('time received ≤ beforeDate');
-    expect(script).toContain('set year of beforeDate to 2025');
-    expect(script).toContain('set month of beforeDate to 12');
+    expect(script).toContain('set year of beforeDate to 2026');
+    expect(script).toContain('set month of beforeDate to 1');
   });
 
   it('combines after + before + unreadOnly in whose clause', () => {
@@ -1054,5 +1071,129 @@ describe('isoToAppleTimestamp / appleTimestampToIso', () => {
   it('returns null for null/undefined apple timestamp', () => {
     expect(appleTimestampToIso(null)).toBeNull();
     expect(appleTimestampToIso(undefined)).toBeNull();
+  });
+});
+
+// =============================================================================
+// Regression: updateEvent date handling
+//
+// updateEvent previously built start/end dates as a locale-dependent
+// `date "YYYY-M-D H:M:00"` string literal, which AppleScript parses
+// according to the system's date format — on non-US locales this silently
+// produced a garbage date (observed: 4500-12-31) instead of throwing.
+// It must build dates the same component-setter way createEvent does.
+// =============================================================================
+
+describe('Regression: updateEvent builds dates via component setters, not date strings', () => {
+  it('does NOT use a locale-dependent date "..." string literal for startDate/endDate', () => {
+    const script = updateEvent({
+      eventId: 123,
+      applyTo: 'this_instance',
+      updates: { startDate: '2026-11-02T13:00:00Z', endDate: '2026-11-02T13:45:00Z' },
+    });
+    expect(script).not.toMatch(/date "\d+-\d+-\d+ \d+:\d+:00"/);
+  });
+
+  it('sets start time via year/month/day/hours/minutes component setters', () => {
+    // 2026-11-02T13:00:00Z is 2026-11-02 14:00 in Europe/Warsaw (CET, UTC+1)
+    const script = updateEvent({
+      eventId: 123,
+      applyTo: 'this_instance',
+      updates: { startDate: '2026-11-02T13:00:00Z' },
+    });
+    expect(script).toContain('set theNewStartDate to current date');
+    expect(script).toContain('set year of theNewStartDate to 2026');
+    expect(script).toContain('set month of theNewStartDate to 11');
+    expect(script).toContain('set day of theNewStartDate to 2');
+    expect(script).toContain('set hours of theNewStartDate to 14');
+    expect(script).toContain('set minutes of theNewStartDate to 0');
+    expect(script).toContain('set start time of myEvent to theNewStartDate');
+  });
+
+  it('sets end time via year/month/day/hours/minutes component setters', () => {
+    const script = updateEvent({
+      eventId: 123,
+      applyTo: 'this_instance',
+      updates: { endDate: '2026-11-02T13:45:00Z' },
+    });
+    expect(script).toContain('set theNewEndDate to current date');
+    expect(script).toContain('set end time of myEvent to theNewEndDate');
+  });
+
+  it('sets day to 1 first to avoid month-overflow when setting the date', () => {
+    const script = updateEvent({
+      eventId: 123,
+      applyTo: 'this_instance',
+      updates: { startDate: '2026-11-02T13:00:00Z' },
+    });
+    const lines = script.split('\n');
+    const dayTo1Idx = lines.findIndex(l => l.includes('set day of theNewStartDate to 1'));
+    const yearIdx = lines.findIndex(l => l.includes('set year of theNewStartDate to'));
+    expect(dayTo1Idx).toBeGreaterThanOrEqual(0);
+    expect(dayTo1Idx).toBeLessThan(yearIdx);
+  });
+});
+
+// =============================================================================
+// Regression: sender/recipient address extraction
+//
+// Chaining `address of sender of m` (or `address of r` on a recipient loop
+// variable) directly in one AppleScript expression fails for Outlook's
+// message/recipient object model — it must be split into two steps: fetch
+// the sender/recipient's email-address record into a variable with `get`
+// first, then read `address of`/`name of` that variable. Previously the
+// chained form failed silently (caught by `try`), so sender/senderAddress
+// and recipient fields were always empty.
+// =============================================================================
+
+describe('Regression: sender/recipient address extraction uses two-step get', () => {
+  it('listMessages does not use the fragile chained form', () => {
+    const script = listMessages(100, 10, 0, false);
+    expect(script).not.toContain('address of sender of m');
+    expect(script).not.toContain('name of sender of m');
+    expect(script).toContain('set theSender to get sender of m');
+    expect(script).toContain('set mSender to get address of theSender');
+    expect(script).toContain('set mSenderName to get name of theSender');
+  });
+
+  it('getMessage does not use the fragile chained form', () => {
+    const script = getMessage(123);
+    expect(script).not.toContain('address of sender of m');
+    expect(script).not.toContain('name of sender of m');
+    expect(script).toContain('set theSender to get sender of m');
+  });
+
+  it('getMessage extracts recipient addresses via "email address of r", not "address of r" directly', () => {
+    const script = getMessage(123);
+    expect(script).not.toContain('(address of r)');
+    expect(script).toContain('set rEa to get email address of r');
+    expect(script).toContain('(get address of rEa)');
+  });
+
+  it('searchMessages (phase 1 and phase 2) does not use the fragile chained form', () => {
+    const script = searchMessages('invoice', null, 10, 0);
+    expect(script).not.toContain('address of sender of m');
+    expect(script).not.toContain('name of sender of m');
+  });
+});
+
+// =============================================================================
+// Regression: listMailFoldersByAccounts whose-clause operator
+//
+// The generated `whose id ${id}` clause was missing the `=` comparison
+// operator, which is a hard AppleScript syntax error ("Expected: ','").
+// Every call to list_folders with an account_id filter failed.
+// =============================================================================
+
+describe('Regression: listMailFoldersByAccounts whose clause', () => {
+  it('uses "id = X" with the comparison operator, not bare "id X"', () => {
+    const script = listMailFoldersByAccounts([1]);
+    expect(script).toContain('whose id = 1');
+    expect(script).not.toContain('whose id 1');
+  });
+
+  it('joins multiple account ids with "or", each with its own "=" operator', () => {
+    const script = listMailFoldersByAccounts([1, 2, 3]);
+    expect(script).toContain('whose id = 1 or id = 2 or id = 3');
   });
 });

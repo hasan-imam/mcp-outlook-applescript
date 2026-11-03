@@ -159,12 +159,15 @@ ${dateVarBlock}${fetchBlock}
       set mId to id of m
       set mSubject to subject of m
       set mSender to ""
-      try
-        set mSender to address of sender of m
-      end try
       set mSenderName to ""
       try
-        set mSenderName to name of sender of m
+        set theSender to get sender of m
+        try
+          set mSender to get address of theSender
+        end try
+        try
+          set mSenderName to get name of theSender
+        end try
       end try
       set mDate to ""
       try
@@ -272,12 +275,15 @@ ${dateVarBlock}
         set mId to id of m
         set mSubject to subject of m
         set mSender to ""
-        try
-          set mSender to address of sender of m
-        end try
         set mSenderName to ""
         try
-          set mSenderName to name of sender of m
+          set theSender to get sender of m
+          try
+            set mSender to get address of theSender
+          end try
+          try
+            set mSenderName to get name of theSender
+          end try
         end try
         set mDate to ""
         try
@@ -320,7 +326,8 @@ ${FLAG_STATUS_BLOCK}
         set mId to id of m
         set mSender to ""
         try
-          set mSender to address of sender of m
+          set theSender to get sender of m
+          set mSender to get address of theSender
         end try
         if mSender contains "${escapedQuery}" then${phase2DateCheck}
           if phase2Skipped < phase2Skip then
@@ -329,7 +336,8 @@ ${FLAG_STATUS_BLOCK}
             set mSubject to subject of m
             set mSenderName to ""
             try
-              set mSenderName to name of sender of m
+              set theSender to get sender of m
+              set mSenderName to get name of theSender
             end try
             set mDate to ""
             try
@@ -360,12 +368,15 @@ tell application "Microsoft Outlook"
   set mId to id of m
   set mSubject to subject of m
   set mSender to ""
-  try
-    set mSender to address of sender of m
-  end try
   set mSenderName to ""
   try
-    set mSenderName to name of sender of m
+    set theSender to get sender of m
+    try
+      set mSender to get address of theSender
+    end try
+    try
+      set mSenderName to get name of theSender
+    end try
   end try
   set mDateReceived to ""
   try
@@ -403,13 +414,19 @@ tell application "Microsoft Outlook"
   set toList to ""
   try
     repeat with r in to recipients of m
-      set toList to toList & (address of r) & ","
+      try
+        set rEa to get email address of r
+        set toList to toList & (get address of rEa) & ","
+      end try
     end repeat
   end try
   set ccList to ""
   try
     repeat with r in cc recipients of m
-      set ccList to ccList & (address of r) & ","
+      try
+        set rEa to get email address of r
+        set ccList to ccList & (get address of rEa) & ","
+      end try
     end repeat
   end try
 
@@ -841,12 +858,28 @@ export function updateEvent(params) {
     }
     if (updates.startDate != null) {
         const start = isoToDateComponents(updates.startDate);
-        updateStatements += `    set start time of myEvent to date "${start.year}-${start.month}-${start.day} ${start.hours}:${start.minutes}:00"\n`;
+        updateStatements += `    set theNewStartDate to current date\n`;
+        updateStatements += `    set day of theNewStartDate to 1\n`;
+        updateStatements += `    set year of theNewStartDate to ${start.year}\n`;
+        updateStatements += `    set month of theNewStartDate to ${start.month}\n`;
+        updateStatements += `    set day of theNewStartDate to ${start.day}\n`;
+        updateStatements += `    set hours of theNewStartDate to ${start.hours}\n`;
+        updateStatements += `    set minutes of theNewStartDate to ${start.minutes}\n`;
+        updateStatements += `    set seconds of theNewStartDate to 0\n`;
+        updateStatements += `    set start time of myEvent to theNewStartDate\n`;
         updatedFields.push('startDate');
     }
     if (updates.endDate != null) {
         const end = isoToDateComponents(updates.endDate);
-        updateStatements += `    set end time of myEvent to date "${end.year}-${end.month}-${end.day} ${end.hours}:${end.minutes}:00"\n`;
+        updateStatements += `    set theNewEndDate to current date\n`;
+        updateStatements += `    set day of theNewEndDate to 1\n`;
+        updateStatements += `    set year of theNewEndDate to ${end.year}\n`;
+        updateStatements += `    set month of theNewEndDate to ${end.month}\n`;
+        updateStatements += `    set day of theNewEndDate to ${end.day}\n`;
+        updateStatements += `    set hours of theNewEndDate to ${end.hours}\n`;
+        updateStatements += `    set minutes of theNewEndDate to ${end.minutes}\n`;
+        updateStatements += `    set seconds of theNewEndDate to 0\n`;
+        updateStatements += `    set end time of myEvent to theNewEndDate\n`;
         updatedFields.push('endDate');
     }
     if (updates.isAllDay != null) {

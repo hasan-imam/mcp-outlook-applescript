@@ -98,7 +98,7 @@ end tell
  * @returns A ready-to-execute AppleScript string.
  */
 export function listMailFoldersByAccounts(accountIds: number[]): string {
-    const accountFilter = accountIds.map(id => `id ${id}`).join(' or id ');
+    const accountFilter = accountIds.map(id => `id = ${id}`).join(' or ');
     return `
 tell application "Microsoft Outlook"
   set output to ""

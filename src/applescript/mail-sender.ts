@@ -86,7 +86,9 @@ export class AppleScriptMailSender implements IMailSender {
         if (params.accountId != null)
             scriptParams = { ...scriptParams, accountId: params.accountId };
         const script = scripts.sendEmail(scriptParams);
-        const output = executeAppleScriptOrThrow(script);
+        // Sending can involve Outlook re-authenticating to the mail server,
+        // which sometimes takes longer than the default 30s timeout.
+        const output = executeAppleScriptOrThrow(script, { timeoutMs: 60000 });
         const result = parseSendEmailResult(output);
         if (result == null) {
             throw new AppleScriptError('Failed to parse send email response');
